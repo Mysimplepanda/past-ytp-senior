@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Code Storer</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --sidebar-w: 240px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      position: fixed;
+      top: 0; left: 0;
+      width: var(--sidebar-w);
+      height: 100vh;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 24px 0 40px;
+      z-index: 10;
+    }
+
+    #sidebar .logo {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding: 0 20px 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+
+    .nav-group { margin-bottom: 8px; }
+
+    .nav-folder {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 20px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .nav-folder:hover { color: var(--accent); }
+
+    .nav-folder svg {
+      flex-shrink: 0;
+      color: var(--muted);
+    }
+
+    .nav-files {
+      list-style: none;
+      padding-bottom: 4px;
+    }
+
+    .nav-files li a {
+      display: block;
+      padding: 3px 20px 3px 36px;
+      font-size: 12px;
+      color: var(--muted);
+      text-decoration: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      border-left: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+    }
+
+    .nav-files li a:hover {
+      color: var(--text);
+      border-left-color: var(--border);
+    }
+
+    /* ── Main ── */
+    #main {
+      margin-left: var(--sidebar-w);
+      padding: 48px 56px 80px;
+      max-width: calc(var(--sidebar-w) + 860px);
+    }
+
+    .section + .section { margin-top: 64px; }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 28px;
+    }
+
+    .section-title span {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2px 10px;
+    }
+
+    /* ── File block ── */
+    .file-block { margin-bottom: 24px; }
+
+    .file-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-bottom: none;
+      border-radius: 6px 6px 0 0;
+      padding: 9px 16px;
+    }
+
+    .file-name {
+      font-family: ui-monospace, 'SFMono-Regular', 'Cascadia Code', monospace;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--accent);
+    }
+
+    .copy-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 11px;
+      padding: 3px 10px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .copy-btn:hover { color: var(--text); border-color: var(--muted); }
+    .copy-btn.ok { color: var(--green); border-color: var(--green); }
+
+    pre {
+      margin: 0;
+      border: 1px solid var(--border);
+      border-radius: 0 0 6px 6px;
+      overflow-x: auto;
+    }
+
+    pre code.hljs {
+      font-size: 13px;
+      line-height: 1.65;
+      border-radius: 0 0 6px 6px;
+    }
+
+    /* ── States ── */
+    .placeholder {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 18px 20px;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+
+    .error-block {
+      background: #2a1215;
+      border: 1px solid #5c2b2e;
+      border-radius: 6px;
+      color: #ff8a80;
+      padding: 16px 20px;
+      font-size: 13px;
+      margin-bottom: 24px;
+    }
+
+    /* ── Loading overlay ── */
+    #overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      z-index: 100;
+    }
+
+    #overlay h1 { font-size: 22px; font-weight: 700; }
+
+    #overlay p {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 720px) {
+      #sidebar { display: none; }
+      #main { margin-left: 0; padding: 24px 20px 60px; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="overlay">
+  <h1>Code Storer</h1>
+  <p id="status">Fetching repository…</p>
+</div>
+
+<nav id="sidebar">
+  <div class="logo">Code Storer</div>
+  <div id="nav"></div>
+</nav>
+
+<main id="main"></main>
+
+<script>
+// ── Config ─────────────────────────────────────────────────────────────────
+const OWNER  = 'Mysimplepanda';
+const REPO   = 'codes-for-uni';
+const BRANCH = 'main';
+// ───────────────────────────────────────────────────────────────────────────
+
+const status  = document.getElementById('status');
+const navEl   = document.getElementById('nav');
+const mainEl  = document.getElementById('main');
+const overlay = document.getElementById('overlay');
+
+const setStatus = msg => { status.textContent = msg; };
+
+const EXT_LANG = {
+  cpp:'cpp', cc:'cpp', cxx:'cpp', h:'cpp',
+  c:'c',
+  py:'python',
+  js:'javascript', mjs:'javascript',
+  ts:'typescript',
+  java:'java',
+  rs:'rust',
+  go:'go',
+  rb:'ruby',
+  sh:'bash', bash:'bash',
+  md:'markdown',
+  html:'html',
+  css:'css',
+  json:'json',
+  xml:'xml',
+  sql:'sql',
+  txt:'plaintext',
+};
+
+function langOf(filename) {
+  const ext = filename.split('.').pop().toLowerCase();
+  return EXT_LANG[ext] || 'plaintext';
+}
+
+function folderIcon() {
+  return `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+    <path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75Z"/>
+  </svg>`;
+}
+
+async function fetchTree() {
+  const url = `https://api.github.com/repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`;
+  const r = await fetch(url, { headers: { Accept: 'application/vnd.github.v3+json' } });
+  if (!r.ok) throw new Error(`GitHub API ${r.status}: ${r.statusText}`);
+  const data = await r.json();
+  if (data.message) throw new Error(data.message);
+  return data.tree;
+}
+
+async function fetchFile(path) {
+  const url = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${path}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.text();
+}
+
+function makeFileBlock(folderId, filename) {
+  const id = `f-${folderId}-${filename}`;
+
+  const block = document.createElement('div');
+  block.className = 'file-block';
+  block.id = id;
+
+  const header = document.createElement('div');
+  header.className = 'file-header';
+
+  const name = document.createElement('span');
+  name.className = 'file-name';
+  name.textContent = filename;
+
+  const btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.textContent = 'Copy';
+
+  header.append(name, btn);
+
+  const pre  = document.createElement('pre');
+  const code = document.createElement('code');
+  pre.appendChild(code);
+  block.append(header, pre);
+
+  return { block, code, btn };
+}
+
+async function loadAndRender(path, folderId, filename, placeholder) {
+  try {
+    const content = await fetchFile(path);
+    const { block, code, btn } = makeFileBlock(folderId, filename);
+
+    code.className = `language-${langOf(filename)}`;
+    code.textContent = content;
+    hljs.highlightElement(code);
+
+    btn.onclick = () => {
+      navigator.clipboard.writeText(content).then(() => {
+        btn.textContent = 'Copied!';
+        btn.classList.add('ok');
+        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('ok'); }, 2000);
+      });
+    };
+
+    placeholder.replaceWith(block);
+  } catch (err) {
+    const errEl = document.createElement('div');
+    errEl.className = 'error-block';
+    errEl.textContent = `Failed to load ${filename}: ${err.message}`;
+    placeholder.replaceWith(errEl);
+  }
+}
+
+async function init() {
+  try {
+    setStatus('Fetching repository structure…');
+    const tree = await fetchTree();
+
+    // Build structure: { folder: [{ name, path }] }
+    const structure = {};
+    for (const item of tree) {
+      const parts = item.path.split('/');
+      if (parts.length !== 2 || item.type !== 'blob') continue;
+      const [folder, filename] = parts;
+      if (folder.startsWith('.')) continue;
+      if (!structure[folder]) structure[folder] = [];
+      structure[folder].push({ name: filename, path: item.path });
+    }
+
+    const folders = Object.keys(structure).sort();
+
+    if (folders.length === 0) {
+      overlay.remove();
+      mainEl.innerHTML = '<div class="error-block">No folders found in the repository root.</div>';
+      return;
+    }
+
+    for (const folder of folders) {
+      const files = structure[folder];
+      const folderId = folder.replace(/[^a-zA-Z0-9]/g, '-');
+
+      // ── Nav entry ──
+      const group = document.createElement('div');
+      group.className = 'nav-group';
+
+      const folderLink = document.createElement('a');
+      folderLink.className = 'nav-folder';
+      folderLink.href = `#section-${folderId}`;
+      folderLink.innerHTML = `${folderIcon()} ${folder.toUpperCase()}`;
+
+      const fileList = document.createElement('ul');
+      fileList.className = 'nav-files';
+
+      for (const file of files) {
+        const li  = document.createElement('li');
+        const a   = document.createElement('a');
+        a.href    = `#f-${folderId}-${file.name}`;
+        a.title   = file.name;
+        a.textContent = file.name;
+        li.appendChild(a);
+        fileList.appendChild(li);
+      }
+
+      group.append(folderLink, fileList);
+      navEl.appendChild(group);
+
+      // ── Section ──
+      const section = document.createElement('div');
+      section.className = 'section';
+      section.id = `section-${folderId}`;
+
+      const heading = document.createElement('h2');
+      heading.className = 'section-title';
+      heading.innerHTML = `${folder.toUpperCase()} <span>${files.length} file${files.length !== 1 ? 's' : ''}</span>`;
+      section.appendChild(heading);
+
+      for (const file of files) {
+        const ph = document.createElement('div');
+        ph.className = 'placeholder';
+        ph.textContent = `Loading ${file.name}…`;
+        section.appendChild(ph);
+
+        // Fire-and-forget — loads in parallel
+        loadAndRender(file.path, folderId, file.name, ph);
+      }
+
+      mainEl.appendChild(section);
+    }
+
+    overlay.remove();
+
+  } catch (err) {
+    setStatus(`Error: ${err.message}`);
+    console.error(err);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
